@@ -51,7 +51,8 @@ void read_thread(int tid, int cpu) {
   }
   std::this_thread::sleep_for(std::chrono::milliseconds(tid * 100));
   cout << "tid: " << tid << ", drop cnt: " << (MaxI - cnt) << ", latency stats: " << endl;
-  stats.print(cout);
+  // 1 cycle = 1 / 2496.010 MHz = 0.400639 ns
+  stats.print(cout, 0.400639);
   cout << endl;
 }
 

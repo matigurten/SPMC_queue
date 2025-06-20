@@ -4,16 +4,18 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <ctime>
+#include <cstdint>
+#include "structs.h"
 #include "../SPMCQueue.h"
 
-struct Msg
-{
-  uint64_t tsc;
-  uint64_t i;
-  uint64_t pad[188];
-};
+using Q = SPMCQueue<Event, 1024>;
 
-using Q = SPMCQueue<Msg, 1024>;
+inline uint64_t get_ns_since_epoch() {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return static_cast<uint64_t>(ts.tv_sec) * 1000000000ULL + ts.tv_nsec;
+}
 
 inline uint64_t rdtsc() {
   return __builtin_ia32_rdtsc();

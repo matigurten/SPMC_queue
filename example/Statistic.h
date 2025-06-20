@@ -13,7 +13,7 @@ public:
 
   void add(T v) { vec.push_back(v); }
 
-  void print(std::ostream& os) {
+  void print(std::ostream& os, double cycles_to_ns = 0.0) {
     size_t n = vec.size();
     os << "cnt: " << n << std::endl;
     if (n == 0) return;
@@ -26,16 +26,27 @@ public:
       var += (v - mean) * (v - mean);
     }
     var /= n;
-    os << "min: " << vec.front() << std::endl;
-    os << "max: " << vec.back() << std::endl;
-    os << "first:  " << first << std::endl;
-    os << "mean: " << mean << std::endl;
-    os << "sd: " << sqrt(var) << std::endl;
-    os << "1%: " << vec[n * 1 / 100] << std::endl;
-    os << "10%: " << vec[n * 10 / 100] << std::endl;
-    os << "50%: " << vec[n * 50 / 100] << std::endl;
-    os << "90%: " << vec[n * 90 / 100] << std::endl;
-    os << "99%: " << vec[n * 99 / 100] << std::endl;
+    auto print_val = [&](const char* label, T val) {
+      os << label << ": " << val;
+      if (cycles_to_ns > 0.0) {
+        os << " (" << static_cast<uint64_t>(val * cycles_to_ns) << " ns)";
+      }
+      os << std::endl;
+    };
+    print_val("min", vec.front());
+    print_val("max", vec.back());
+    print_val("first", first);
+    print_val("mean", mean);
+    os << "sd: " << sqrt(var);
+    if (cycles_to_ns > 0.0) {
+      os << " (" << static_cast<uint64_t>(sqrt(var) * cycles_to_ns) << " ns)";
+    }
+    os << std::endl;
+    print_val("1%", vec[n * 1 / 100]);
+    print_val("10%", vec[n * 10 / 100]);
+    print_val("50%", vec[n * 50 / 100]);
+    print_val("90%", vec[n * 90 / 100]);
+    print_val("99%", vec[n * 99 / 100]);
   }
 
 private:
