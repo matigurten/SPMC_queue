@@ -23,9 +23,6 @@ int calc_order_level(int side, double price, const std::map<double, std::list<Ev
     }
 }
 
-int last_order_level = 0;
-int last_order_side = -1;
-
 void OrderBook::process_event(Event* ev) {
     latest_seq = ev->seq;
     latest_timestamp = ev->arrival_time; // Store latest event timestamp
@@ -226,6 +223,8 @@ void OrderBook::snapshot_fod(SnapshotFOD& snap) const {
     snap.trading_phase = trading_phase;
     snap.last_price = last_price;
     snap.volume = volume;
+    snap.level_changed = last_order_level;
+    snap.side_changed = last_order_side;
     // Top 10 bids
     int i = 0;
     for (auto it = bids.begin(); it != bids.end() && i < 10; ++it, ++i) {
@@ -258,4 +257,10 @@ void OrderBook::snapshot_fod(SnapshotFOD& snap) const {
         snap.asks[i].amount = 0;
         snap.asks[i].orders = 0;
     }
+}
+
+// Check if the last order modified the visible book (first 10 levels)
+bool OrderBook::did_modify_visible_book() const {
+    // If the order level is <= 10, it modified the visible book
+    return last_order_level <= 10;
 } 

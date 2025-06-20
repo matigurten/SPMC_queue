@@ -1,66 +1,70 @@
 #pragma once
+
+#include <iostream>
 #include <atomic>
 #include <cstdint>
-#include <iostream>
-#include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <cstring>
-#include <cerrno>
+#include <errno.h>
 #include "structs.h"
-#include "shm.h"
 
-// Snapshot shared memory structure for multi-consumer distribution
-struct alignas(64) SnapshotSHM {
-    // Header information
-    std::atomic<uint64_t> write_seq{0};        // Sequence number for writes
-    std::atomic<uint64_t> last_tob_seq{0};     // Last TOB snapshot sequence
-    std::atomic<uint64_t> last_fod_seq{0};     // Last FOD snapshot sequence
-    std::atomic<uint64_t> write_timestamp{0};  // Last write timestamp
-    
-    // Snapshot data
-    SnapshotTOB latest_tob;                    // Latest TOB snapshot
-    SnapshotFOD latest_fod;                    // Latest FOD snapshot
-    
-    // Consumer tracking (optional - for monitoring)
-    std::atomic<uint32_t> active_consumers{0}; // Number of active consumers
-    std::atomic<uint64_t> last_consumer_read{0}; // Last consumer read timestamp
+// Forward declaration to avoid conflicts
+uint64_t get_ns_since_epoch();
+
+// Shared memory structure for snapshots
+struct SnapshotSHM {
+    std::atomic<uint64_t> last_tob_seq{0};
+    std::atomic<uint64_t> last_fod_seq{0};
+    std::atomic<uint64_t> last_consumer_read{0};
+    std::atomic<uint32_t> active_consumers{0};
+    SnapshotTOB latest_tob;
+    SnapshotFOD latest_fod;
 };
 
-// Helper functions for snapshot shared memory
+// Create snapshot shared memory
 inline SnapshotSHM* create_snapshot_shm(const char* name) {
     int fd = shm_open(name, O_CREAT | O_RDWR, 0666);
     if (fd == -1) {
         std::cerr << "shm_open failed for snapshot: " << strerror(errno) << std::endl;
         return nullptr;
     }
-    if (ftruncate(fd, sizeof(SnapshotSHM))) {
+    
+    if (ftruncate(fd, sizeof(SnapshotSHM)) == -1) {
         std::cerr << "ftruncate failed for snapshot: " << strerror(errno) << std::endl;
         close(fd);
         return nullptr;
     }
+    
     SnapshotSHM* ret = (SnapshotSHM*)mmap(0, sizeof(SnapshotSHM), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    close(fd);
     if (ret == MAP_FAILED) {
         std::cerr << "mmap failed for snapshot: " << strerror(errno) << std::endl;
+        close(fd);
         return nullptr;
     }
+    
+    close(fd);
     return ret;
 }
 
+// Open existing snapshot shared memory
 inline SnapshotSHM* open_snapshot_shm(const char* name) {
     int fd = shm_open(name, O_RDONLY, 0666);
     if (fd == -1) {
         std::cerr << "shm_open failed for snapshot read: " << strerror(errno) << std::endl;
         return nullptr;
     }
+    
     SnapshotSHM* ret = (SnapshotSHM*)mmap(0, sizeof(SnapshotSHM), PROT_READ, MAP_SHARED, fd, 0);
-    close(fd);
     if (ret == MAP_FAILED) {
         std::cerr << "mmap failed for snapshot read: " << strerror(errno) << std::endl;
+        close(fd);
         return nullptr;
     }
+    
+    close(fd);
     return ret;
 }
 

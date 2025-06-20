@@ -3,6 +3,7 @@
 #include <thread>
 #include <signal.h>
 #include "snapshot_shm.h"
+#include "shm.h"
 
 volatile bool running = true;
 

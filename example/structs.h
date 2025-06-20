@@ -68,12 +68,14 @@ struct alignas(64) SnapshotFOD {
     uint64_t timestamp;       // 8 bytes
     uint16_t trading_phase;   // 2 bytes
     uint8_t last_aggression;  // 1 byte
+    int8_t side_changed;      // 1 byte
+    int8_t level_changed;     // 1 byte
     uint8_t _pad[1];          // 1 byte padding for alignment
     double last_price;        // 8 bytes
     uint64_t volume;          // 8 bytes
     PriceLevel bids[10];      // 160 bytes
     PriceLevel asks[10];      // 160 bytes
-    uint8_t _pad2[24];        // 24 bytes
+    uint8_t _pad2[22];        // 22 bytes (reduced from 24 to accommodate new fields)
 };
 #pragma pack(pop)
 static_assert(sizeof(SnapshotFOD) == 384, "SnapshotFOD should be 384 bytes");

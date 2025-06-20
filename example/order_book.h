@@ -20,6 +20,8 @@ public:
     uint64_t volume = 0;
     int last_aggression = -1; // -1 = none, 0 = bid, 1 = ask
     uint16_t trading_phase = TradingPhase::CONTINUOUS_TRADING; // Default: continuous trading
+    int last_order_level = 0; // Track the level of the last processed order
+    int last_order_side = -1; // Track the side of the last processed order
 
     void set_trading_phase(uint16_t phase) { trading_phase = phase; }
     void process_event(Event* ev);
@@ -29,6 +31,13 @@ public:
 
     // Returns true if the current trading phase allows book crossing
     bool is_cross_allowed() const;
+
+    // Get the level of the last processed order
+    int get_last_order_level() const { return last_order_level; }
+    int get_last_order_side() const { return last_order_side; }
+    
+    // Check if the last order modified the visible book (first 10 levels)
+    bool did_modify_visible_book() const;
 
     // Snapshots
     void snapshot_tob(SnapshotTOB& snap) const;
