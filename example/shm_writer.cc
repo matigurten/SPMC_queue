@@ -1,55 +1,73 @@
-#include <bits/stdc++.h>
+#include <iostream>
+#include <random>
+#include <chrono>
+#include <thread>
+#include <cstring>
+#include "../SPMCQueue.h"
 #include "structs.h"
 #include "shm.h"
-using namespace std;
+
+using Q = SPMCQueue<Event, 1024>;
+
+constexpr double PRICE_STEP = 0.1; // Price step for rounding
 
 // usage: ./shm_write [shm file]
 // use taskset -c to bind core
 int main(int argc, char** argv) {
-  const char* shm_file = "SPMCQueue_test";
-  if (argc >= 2) {
-    shm_file = argv[1];
+  if (argc != 2) {
+    printf("usage: %s qname\n", argv[0]);
+    return 1;
   }
-  Q* q = shmmap(shm_file);
-  if (!q) return 1;
-
+  const char* qname = argv[1];
+  auto q = shmmap(qname);
+  if (!q) {
+    perror("failed to create queue");
+    return 1;
+  }
+  
   std::random_device rd;
   std::mt19937 gen(rd());
-  std::exponential_distribution<double> exp_amount_dist(1.0 / 20.0); // mean ~20
-  std::normal_distribution<double> normal_price_dist(150.0, 5.0); // mean 150, stddev 5
-  std::uniform_int_distribution<int> side_dist(0, 1); // 0 or 1
-  double price_step = 0.1;
-  double price_min = 100.0;
-  double price_max = 200.0;
-  std::uniform_int_distribution<uint32_t> gTm_dist(100, 5000); // gateway to matching time: 0.1us to 5us
-  std::uniform_int_distribution<uint32_t> mTs_dist(50, 2000);  // matching to sending time: 0.05us to 2us
-
-  int64_t seq = 0;
+  std::uniform_int_distribution<> side_dist(0, 1);
+  std::bernoulli_distribution add_dist(0.8); // 80% adds, 20% cancels
+  std::uniform_int_distribution<> amount_dist(1, 100);
+  std::uniform_real_distribution<> price_offset_dist(0.1, 3.0); // Reduced range for more overlap
+  std::uniform_real_distribution<> crossing_dist(0.0, 1.0); // For occasional crossing orders
+  
+  uint64_t seq = 1;
   while (true) {
-    q->write([seq, &gen, &exp_amount_dist, &normal_price_dist, &side_dist, price_step, price_min, price_max, &gTm_dist, &mTs_dist](Event& msg) {
-      msg.instrument_id = 1234; // integer instrument_id
-      msg.seq = seq;
-      msg.event_type = 1;
-      msg.side = static_cast<uint8_t>(side_dist(gen));
-      msg.order_type = 1;
-      // Exponential distribution for amount
-      double raw_amount = exp_amount_dist(gen);
-      uint32_t amount = static_cast<uint32_t>(std::round(raw_amount));
-      if (amount < 1) amount = 1;
-      if (amount > 100) amount = 100;
-      msg.amount = amount;
-      // Normal distribution for price, clamped and rounded
-      double raw_price = normal_price_dist(gen);
-      if (raw_price < price_min) raw_price = price_min;
-      if (raw_price > price_max) raw_price = price_max;
-      msg.price = std::round(raw_price / price_step) * price_step;
-      msg.order_id = 1000000ULL + seq;
-      msg.order_id2 = 2000000ULL + seq;
-      msg.gTm = gTm_dist(gen);
-      msg.mTs = mTs_dist(gen);
+    q->write([&](Event& msg) {
+      // Calculate parsing latency and set timestamps
+      msg.arrival_time = get_ns_since_epoch();
 
-      uint64_t now = get_ns_since_epoch();
-      msg.arrivalTime = now;
+      // ... simulate some work ...
+      std::this_thread::sleep_for(std::chrono::nanoseconds(10)); // Placeholder for actual work
+
+      msg.write_time = get_ns_since_epoch();
+      msg.parsing_latency = msg.write_time - msg.arrival_time;
+
+      // Set other fields
+      msg.instrument_id = 1;
+      msg.seq = seq;
+      msg.event_type = add_dist(gen) ? EVENT_TYPE_ADD : EVENT_TYPE_CANCEL;
+      msg.side = side_dist(gen);
+      msg.order_type = 1;
+      msg.amount = amount_dist(gen);
+      
+      // Generate prices with some overlap for potential trades
+      double base_price = 100.0;
+      double offset = price_offset_dist(gen);
+      
+      if (msg.side == 0) { // Bid
+          // Bids: 97.0 to 100.5 (allowing some to cross above 100.0)
+          double raw_price = base_price - offset + (crossing_dist(gen) * 0.5);
+          msg.price = std::round(raw_price / PRICE_STEP) * PRICE_STEP;
+      } else { // Ask
+          // Asks: 99.5 to 103.0 (allowing some to cross below 100.0)
+          double raw_price = base_price + offset - (crossing_dist(gen) * 0.5);
+          msg.price = std::round(raw_price / PRICE_STEP) * PRICE_STEP;
+      }
+      msg.order_id = seq; // Use seq as order_id for simplicity
+      msg.other_id = 0;
     });
     seq++;
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));

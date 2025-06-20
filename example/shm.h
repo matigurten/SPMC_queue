@@ -8,6 +8,7 @@
 #include <cstdint>
 #include "structs.h"
 #include "../SPMCQueue.h"
+#include <cstring>
 
 using Q = SPMCQueue<Event, 1024>;
 

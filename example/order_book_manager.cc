@@ -1,4 +1,5 @@
 #include "order_book_manager.h"
+#include "order_book.h"
 
 /*
 Order Book Management Methods: Time and Space Complexities
@@ -26,7 +27,10 @@ Other common methods:
 In practice, the map/list + hash method is widely used for high-performance, sparse order books.
 */
 
-void order_book_manager::process_event(Event* ev) {
+// ---- OrderBook Implementation ----
+
+void OrderBook::process_event(Event* ev) {
+    latest_seq = ev->seq;
     switch (ev->event_type) {
         case EVENT_TYPE_ADD:
             add_order(ev);
@@ -37,11 +41,17 @@ void order_book_manager::process_event(Event* ev) {
         case EVENT_TYPE_MODIFY:
             modify_order(ev);
             break;
-        // Trades and other event types can be handled as needed
+        case EVENT_TYPE_TRADE:
+            // For a trade event, update last_price, volume, last_aggression
+            last_price = ev->price;
+            volume += ev->amount;
+            last_aggression = ev->side; // 0=bid, 1=ask
+            break;
     }
+    // If you want to update last_price/volume on add/cancel/modify, add logic here
 }
 
-void order_book_manager::add_order(Event* ev) {
+void OrderBook::add_order(Event* ev) {
     if (ev->side == 0) {
         bids[ev->price].push_back(ev);
     } else {
@@ -50,7 +60,7 @@ void order_book_manager::add_order(Event* ev) {
     order_map[ev->order_id] = ev;
 }
 
-void order_book_manager::cancel_order(Event* ev) {
+void OrderBook::cancel_order(Event* ev) {
     auto it = order_map.find(ev->order_id);
     if (it == order_map.end()) return;
     Event* orig = it->second;
@@ -71,17 +81,17 @@ void order_book_manager::cancel_order(Event* ev) {
     // Do not delete orig, as memory is managed elsewhere
 }
 
-void order_book_manager::modify_order(Event* ev) {
+void OrderBook::modify_order(Event* ev) {
     // Remove old, add new (if price/side changed)
     cancel_order(ev);
     add_order(ev);
 }
 
-void order_book_manager::snapshot_tob(SnapshotTOB& snap, uint32_t instrument_id, uint32_t seq, uint64_t timestamp, uint16_t trading_phase, double last_price, uint64_t volume) {
-    snap.instrument_id = instrument_id;
-    snap.seq = seq;
-    snap.timestamp = timestamp;
-    snap.trading_phase = trading_phase;
+void OrderBook::snapshot_tob(SnapshotTOB& snap) const {
+    snap.instrument_id = 1; // TODO: track instrument_id if needed
+    snap.seq = latest_seq;
+    snap.timestamp = 0; // TODO: set to latest event timestamp if needed
+    snap.trading_phase = 0; // TODO: track trading phase if needed
     snap.last_price = last_price;
     snap.volume = volume;
     // Best bid
@@ -114,11 +124,11 @@ void order_book_manager::snapshot_tob(SnapshotTOB& snap, uint32_t instrument_id,
     }
 }
 
-void order_book_manager::snapshot_fod(SnapshotFOD& snap, uint32_t instrument_id, uint32_t seq, uint64_t timestamp, uint8_t trading_phase, double last_price, uint64_t volume) {
-    snap.instrument_id = instrument_id;
-    snap.seq = seq;
-    snap.timestamp = timestamp;
-    snap.trading_phase = trading_phase;
+void OrderBook::snapshot_fod(SnapshotFOD& snap) const {
+    snap.instrument_id = 1; // TODO: track instrument_id if needed
+    snap.seq = latest_seq;
+    snap.timestamp = 0; // TODO: set to latest event timestamp if needed
+    snap.trading_phase = 0; // TODO: track trading phase if needed
     snap.last_price = last_price;
     snap.volume = volume;
     // Top 10 bids
@@ -153,4 +163,6 @@ void order_book_manager::snapshot_fod(SnapshotFOD& snap, uint32_t instrument_id,
         snap.asks[i].amount = 0;
         snap.asks[i].orders = 0;
     }
-} 
+}
+
+// (No OrderBook logic here. Add OrderBookManager static utilities as needed.) 
