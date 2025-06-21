@@ -29,6 +29,7 @@ SPMC_Queue/
 │   ├── snapshot_monitor.cc  # Snapshot monitoring tool
 │   ├── fod_parquet_writer.cc # Parquet data export
 │   ├── test_fod_reader.cc   # FOD debugging tool
+│   ├── test_snapshot_consumer.sh # Test script for snapshot consumers
 │   ├── structs.h            # Market data event structures
 │   ├── shm.h                # Shared memory definitions
 │   ├── snapshot_shm.h       # Snapshot shared memory structures
@@ -70,31 +71,41 @@ This builds all components:
 
 2. **Start the reader** (processes events, manages order book):
    ```bash
-   ./shm_reader myqueue /snapshots
+   ./shm_reader myqueue /tob_snapshots /fod_snapshots
    ```
 
 3. **Start snapshot consumers** (consume TOB/FOD snapshots):
    ```bash
-   ./snapshot_consumer /snapshots consumer1
-   ./snapshot_consumer /snapshots consumer2
+   ./snapshot_consumer tob /tob_snapshots consumer1
+   ./snapshot_consumer fod /fod_snapshots consumer2 4
    ```
+
+### Quick Test Script
+
+Use the provided test script for easy testing:
+```bash
+chmod +x test_snapshot_consumer.sh
+./test_snapshot_consumer.sh
+```
 
 ### Advanced Usage
 
 **Multiple consumers with different levels:**
 ```bash
-./snapshot_consumer /snapshots consumer1 4  # Show 4 levels
-./snapshot_consumer /snapshots consumer2 8  # Show 8 levels
+./snapshot_consumer tob /tob_snapshots consumer1
+./snapshot_consumer fod /fod_snapshots consumer2 4  # Show 4 levels
+./snapshot_consumer fod /fod_snapshots consumer3 8  # Show 8 levels
 ```
 
 **Monitor snapshots:**
 ```bash
-./snapshot_monitor /snapshots
+./snapshot_monitor /tob_snapshots
+./snapshot_monitor /fod_snapshots
 ```
 
 **Export to Parquet:**
 ```bash
-./fod_parquet_writer /snapshots
+./fod_parquet_writer /fod_snapshots
 ```
 
 ## 📊 Key Components
@@ -128,7 +139,8 @@ This builds all components:
 
 ### Shared Memory Configuration
 - **Event queue**: `/myqueue` (configurable name)
-- **Snapshot queue**: `/snapshots` (configurable name)
+- **TOB snapshots**: `/tob_snapshots` (configurable name)
+- **FOD snapshots**: `/fod_snapshots` (configurable name)
 - **Queue size**: Configurable for different throughput requirements
 
 ## 📈 Performance Characteristics
@@ -144,12 +156,19 @@ This builds all components:
 - `test_fod_reader`: Debug FOD snapshot consumption
 - `snapshot_monitor`: Monitor snapshot publishing
 - `simple_consumer`: Basic event consumption
+- `test_snapshot_consumer.sh`: Complete test script
 
 ### Debugging Tips
 1. Start programs in order: writer → reader → consumers
 2. Use `snapshot_monitor` to verify shared memory creation
 3. Check latency statistics for performance issues
 4. Verify order book state with TOB snapshots
+5. **Important**: Reader needs 3 arguments (queue, tob_shm, fod_shm)
+
+### Common Issues
+- **Segmentation fault**: Make sure reader creates shared memory before consumers start
+- **No snapshots**: Check that reader is running with correct arguments
+- **Wrong shared memory names**: Use `/tob_snapshots` and `/fod_snapshots` as shown
 
 ## 🤝 Contributing
 
