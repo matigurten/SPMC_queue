@@ -90,7 +90,7 @@ void OrderBook::modify_order(Event* ev) {
 void OrderBook::snapshot_tob(SnapshotTOB& snap) const {
     snap.instrument_id = 1; // TODO: track instrument_id if needed
     snap.seq = latest_seq;
-    snap.timestamp = 0; // TODO: set to latest event timestamp if needed
+    snap.arrival_time = 0; 
     snap.trading_phase = 0; // TODO: track trading phase if needed
     snap.last_price = last_price;
     snap.volume = volume;
@@ -127,7 +127,7 @@ void OrderBook::snapshot_tob(SnapshotTOB& snap) const {
 void OrderBook::snapshot_fod(SnapshotFOD& snap) const {
     snap.instrument_id = 1; // TODO: track instrument_id if needed
     snap.seq = latest_seq;
-    snap.timestamp = 0; // TODO: set to latest event timestamp if needed
+    snap.arrival_time = 0;
     snap.trading_phase = 0; // TODO: track trading phase if needed
     snap.last_price = last_price;
     snap.volume = volume;

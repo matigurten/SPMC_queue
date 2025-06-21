@@ -1,4 +1,5 @@
 #include "order_book.h"
+#include "shm.h"
 #include <iostream>
 #include <cmath>
 
@@ -179,7 +180,7 @@ void OrderBook::modify_order(Event* ev) {
 void OrderBook::snapshot_tob(SnapshotTOB& snap) const {
     snap.instrument_id = 1; // TODO: track instrument_id if needed
     snap.seq = latest_seq;
-    snap.timestamp = latest_timestamp;
+    snap.arrival_time = latest_timestamp;
     snap.trading_phase = trading_phase;
     snap.last_price = last_price;
     snap.volume = volume;
@@ -219,12 +220,13 @@ void OrderBook::snapshot_tob(SnapshotTOB& snap) const {
 void OrderBook::snapshot_fod(SnapshotFOD& snap) const {
     snap.instrument_id = 1; // TODO: track instrument_id if needed
     snap.seq = latest_seq;
-    snap.timestamp = latest_timestamp;
+    snap.arrival_time = latest_timestamp;
     snap.trading_phase = trading_phase;
     snap.last_price = last_price;
     snap.volume = volume;
     snap.level_changed = last_order_level;
     snap.side_changed = last_order_side;
+    snap.publish_time = get_ns_since_epoch(); // Set publish time when snapshot is created
     // Top 10 bids
     int i = 0;
     for (auto it = bids.begin(); it != bids.end() && i < 10; ++it, ++i) {

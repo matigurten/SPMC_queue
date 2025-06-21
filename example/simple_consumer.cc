@@ -1,63 +1,75 @@
 #include <iostream>
-#include <chrono>
 #include <thread>
+#include <chrono>
 #include <signal.h>
+#include <atomic>
+#include "structs.h"
 #include "snapshot_shm.h"
-#include "shm.h"
 
-volatile bool running = true;
+std::atomic<bool> running{true};
 
 void signal_handler(int sig) {
     running = false;
 }
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        std::cout << "Usage: " << argv[0] << " <snapshot_shm_name> [consumer_id]" << std::endl;
+    if (argc < 3) {
+        std::cout << "Usage: " << argv[0] << " <tob_shm_name> <fod_shm_name> [consumer_id]" << std::endl;
+        std::cout << "Example: " << argv[0] << " /tob_snapshots /fod_snapshots consumer1" << std::endl;
         return 1;
     }
     
-    const char* snapshot_name = argv[1];
-    std::string consumer_id = (argc > 2) ? argv[2] : "simple";
+    const char* tob_name = argv[1];
+    const char* fod_name = argv[2];
+    const char* consumer_id = (argc > 3) ? argv[3] : "default";
     
+    // Set up signal handler for graceful shutdown
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
     
-    std::cout << "[" << consumer_id << "] Starting simple consumer" << std::endl;
-    std::cout << "[" << consumer_id << "] Connecting to: " << snapshot_name << std::endl;
+    std::cout << "Starting simple consumer [" << consumer_id << "]..." << std::endl;
+    std::cout << "TOB shared memory: " << tob_name << std::endl;
+    std::cout << "FOD shared memory: " << fod_name << std::endl;
     
-    SnapshotConsumer consumer(snapshot_name);
-    if (!consumer.is_valid()) {
-        std::cerr << "[" << consumer_id << "] Failed to connect" << std::endl;
+    // Create consumers
+    TOBConsumer tob_consumer(tob_name);
+    FODConsumer fod_consumer(fod_name);
+    
+    if (!tob_consumer.is_valid() && !fod_consumer.is_valid()) {
+        std::cerr << "Failed to connect to both TOB and FOD shared memory" << std::endl;
+        std::cerr << "Make sure the reader is running and has created the shared memory files." << std::endl;
         return 1;
     }
     
-    std::cout << "[" << consumer_id << "] Connected successfully" << std::endl;
+    std::cout << "Successfully connected to shared memory" << std::endl;
     
     uint64_t last_tob_seq = 0;
     uint64_t last_fod_seq = 0;
     uint64_t tob_count = 0;
     uint64_t fod_count = 0;
     
+    std::cout << "Waiting for snapshots..." << std::endl;
+    
     while (running) {
-        if (consumer.has_new_tob(last_tob_seq)) {
+        // Check for new TOB snapshots
+        if (tob_consumer.has_new_snapshot(last_tob_seq)) {
             tob_count++;
             std::cout << "[" << consumer_id << "] TOB #" << tob_count 
-                      << " (seq=" << last_tob_seq << ")" << std::endl;
-            consumer.update_read_timestamp();
+                      << " [seq=" << last_tob_seq << "]" << std::endl;
         }
         
-        if (consumer.has_new_fod(last_fod_seq)) {
+        // Check for new FOD snapshots
+        if (fod_consumer.has_new_snapshot(last_fod_seq)) {
             fod_count++;
             std::cout << "[" << consumer_id << "] FOD #" << fod_count 
-                      << " (seq=" << last_fod_seq << ")" << std::endl;
-            consumer.update_read_timestamp();
+                      << " [seq=" << last_fod_seq << "]" << std::endl;
         }
         
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // Small sleep to avoid busy waiting
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
     }
     
-    std::cout << "[" << consumer_id << "] Shutting down. Received " 
-              << tob_count << " TOB and " << fod_count << " FOD snapshots" << std::endl;
+    std::cout << "[" << consumer_id << "] Shutting down..." << std::endl;
+    std::cout << "[" << consumer_id << "] Final stats - TOB: " << tob_count << ", FOD: " << fod_count << std::endl;
     return 0;
 } 

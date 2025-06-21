@@ -42,7 +42,7 @@ static_assert(sizeof(PriceLevel) == 16, "PriceLevel must be 16 bytes");
 struct alignas(64) SnapshotTOB {
     uint32_t instrument_id;   // 4 bytes
     uint32_t seq;             // 4 bytes
-    uint64_t timestamp;       // 8 bytes
+    uint64_t arrival_time;    // 8 bytes - when the event that triggered this snapshot arrived
     double bid_price;         // 8 bytes
     double ask_price;         // 8 bytes
     uint32_t bid_amount;      // 4 bytes
@@ -65,17 +65,18 @@ static_assert(sizeof(SnapshotTOB) == 64, "SnapshotTOB should be 64 bytes");
 struct alignas(64) SnapshotFOD {
     uint32_t instrument_id;   // 4 bytes
     uint32_t seq;             // 4 bytes
-    uint64_t timestamp;       // 8 bytes
-    uint16_t trading_phase;   // 2 bytes
+    uint64_t arrival_time;    // 8 bytes - when the event that triggered this snapshot arrived
+    uint8_t trading_phase;    // 1 byte (changed from uint16_t to match TOB)
     uint8_t last_aggression;  // 1 byte
     int8_t side_changed;      // 1 byte
     int8_t level_changed;     // 1 byte
-    uint8_t _pad[1];          // 1 byte padding for alignment
     double last_price;        // 8 bytes
     uint64_t volume;          // 8 bytes
     PriceLevel bids[10];      // 160 bytes
     PriceLevel asks[10];      // 160 bytes
-    uint8_t _pad2[22];        // 22 bytes (reduced from 24 to accommodate new fields)
+    uint64_t publish_time;    // 8 bytes - when snapshot was published to shared memory
+    uint64_t consumed_time;   // 8 bytes - when snapshot was consumed by a consumer
+    uint64_t reaction_time;   // 8 bytes - when the consumer reacted to the snapshot
 };
 #pragma pack(pop)
 static_assert(sizeof(SnapshotFOD) == 384, "SnapshotFOD should be 384 bytes");

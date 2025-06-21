@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <ctime>
 #include <cstdint>
+#include <iostream>
 #include "structs.h"
 #include "../SPMCQueue.h"
 #include <cstring>
